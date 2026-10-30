@@ -212,6 +212,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     // --- workspace scope / strip contents ---
     addInt("plugin:gloview:show_all_workspaces", Config::INTEGER{0}); // main area shows every window on the monitor (expo), not just the displayed workspace
+    addInt("plugin:gloview:show_all_monitors", Config::INTEGER{0});   // expo also shows windows from every other monitor (not in desktop mode)
     addInt("plugin:gloview:show_empty", Config::INTEGER{1});          // keep empty workspaces as strip cards
     // gnome / hyprnome-style workspaces: only populated workspaces are listed and the strip
     // always ends in ONE empty one (drawn as a card, not a "+"). Stepping onto it or dropping

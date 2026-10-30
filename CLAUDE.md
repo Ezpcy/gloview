@@ -272,6 +272,9 @@ slide away). Consequences:
   `m_allOverride` is the runtime tri-state (-1 follow config / 0 forced off / 1 forced on),
   reset on full close. Picking a preview in expo **follows** it — the overview closes onto
   that window's workspace (`activateWindow`), which is separate from plain selection.
+  **`show_all_monitors`** widens expo's membership (`tileBelongs`) to every monitor (never in
+  desktop mode, whose canvas maps one monitor): those tiles are always `fades`, and a pick
+  leaves `m_workspace` alone and lets `fullWindowFocus` switch the window's OWN monitor.
   **Only tiles on the live desktop hand off to a real window — on open those on the active
   workspace (or active scratchpad) shrink in from their real geometry, on close those landing
   on the committed `m_workspace` glide out to it; every other tile is `Tile::fades`**

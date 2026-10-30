@@ -1117,7 +1117,13 @@ bool Overview::tileBelongs(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWOR
     if (showAllWorkspaces()) { // expo: every window living on this monitor, any workspace
         if (wsSpecial(wws) && cfgInt("plugin:gloview:show_special", 0) == 0)
             return false;
-        return wws->m_monitor.lock() == m;
+        // show_all_monitors widens expo to every monitor. Those tiles are never on this
+        // monitor's live desktop, so onLiveDesktop() makes them fade in/out in place, and a pick
+        // hands off through fullWindowFocus, which switches the window's OWN monitor to its
+        // workspace. Not in desktop mode: its canvas maps this one monitor, so another
+        // monitor's window would land off-canvas.
+        const bool allMonitors = cfgInt("plugin:gloview:show_all_monitors", 0) != 0 && !m_desktopMode;
+        return allMonitors || wws->m_monitor.lock() == m;
     }
     return wws == ws; // single displayed workspace (may be inactive; fine)
 }
