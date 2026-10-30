@@ -68,6 +68,11 @@ SDispatchResult dispAllWorkspaces(std::string) {
         g_overview->toggleAllWorkspaces();
     return {.success = true};
 }
+SDispatchResult dispAllMonitors(std::string) {
+    if (g_overview)
+        g_overview->toggleAllMonitors();
+    return {.success = true};
+}
 SDispatchResult dispNext(std::string) {
     if (g_overview)
         g_overview->nextWorkspace();
@@ -116,6 +121,11 @@ int luaDesktop(lua_State*) {
 int luaAllWorkspaces(lua_State*) {
     if (g_overview)
         g_overview->toggleAllWorkspaces();
+    return 0;
+}
+int luaAllMonitors(lua_State*) {
+    if (g_overview)
+        g_overview->toggleAllMonitors();
     return 0;
 }
 int luaNext(lua_State*) {
@@ -212,7 +222,6 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     // --- workspace scope / strip contents ---
     addInt("plugin:gloview:show_all_workspaces", Config::INTEGER{0}); // main area shows every window on the monitor (expo), not just the displayed workspace
-    addInt("plugin:gloview:show_all_monitors", Config::INTEGER{0});   // expo also shows windows from every other monitor (not in desktop mode)
     addInt("plugin:gloview:show_empty", Config::INTEGER{1});          // keep empty workspaces as strip cards
     // gnome / hyprnome-style workspaces: only populated workspaces are listed and the strip
     // always ends in ONE empty one (drawn as a card, not a "+"). Stepping onto it or dropping
@@ -258,6 +267,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addDispatcherV2(handle, "gloview:close", dispClose);
     HyprlandAPI::addDispatcherV2(handle, "gloview:desktop", dispDesktop); // toggle the free-arrange desktop mode
     HyprlandAPI::addDispatcherV2(handle, "gloview:allworkspaces", dispAllWorkspaces); // open/toggle the all-workspaces expo view
+    HyprlandAPI::addDispatcherV2(handle, "gloview:allmonitors", dispAllMonitors);     // open/toggle expo across every monitor
     // Workspace navigation. Inside the overview these move the DISPLAYED workspace (like tab
     // and the scroll wheel) and the live desktop follows on close; with the overview CLOSED
     // they switch the live desktop straight away, stepping the same ordered list the strip
@@ -327,6 +337,17 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
                                                     },
                                                 });
 
+    // expo across every monitor:  hyprctl gloviewallmonitors — opens into it if closed
+    HyprlandAPI::registerHyprCtlCommand(handle, IPC::Socket1::SCommand{
+                                                    .name    = "gloviewallmonitors",
+                                                    .match   = IPC::Socket1::COMMAND_MATCH_EXACT,
+                                                    .handler = [](const IPC::Socket1::SRequest&) -> IPC::Socket1::SResponse {
+                                                        if (g_overview)
+                                                            g_overview->toggleAllMonitors();
+                                                        return "ok\n";
+                                                    },
+                                                });
+
     // step the displayed workspace:  hyprctl gloviewnext / gloviewprev
     // (setworkspace takes an argument, so it is dispatcher-only: hyprctl dispatch gloview:setworkspace 2)
     HyprlandAPI::registerHyprCtlCommand(handle, IPC::Socket1::SCommand{
@@ -356,6 +377,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         HyprlandAPI::addLuaFunction(handle, "gloview", "close", luaClose);
         HyprlandAPI::addLuaFunction(handle, "gloview", "desktop", luaDesktop);
         HyprlandAPI::addLuaFunction(handle, "gloview", "allworkspaces", luaAllWorkspaces);
+        HyprlandAPI::addLuaFunction(handle, "gloview", "allmonitors", luaAllMonitors);
         HyprlandAPI::addLuaFunction(handle, "gloview", "next", luaNext);
         HyprlandAPI::addLuaFunction(handle, "gloview", "prev", luaPrev);
         HyprlandAPI::addLuaFunction(handle, "gloview", "setworkspace", luaSetWorkspace);

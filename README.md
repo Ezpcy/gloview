@@ -48,8 +48,11 @@ hot-reloads into the running Hyprland.
 ## Usage
 
 Dispatchers: `gloview:toggle`, `gloview:open`, `gloview:close`, `gloview:desktop`,
-`gloview:allworkspaces` (the all-workspaces "expo" view — opens into it if closed)
-Or `hyprctl gloview` / `gloviewclose` / `gloviewdesktop` / `gloviewall`
+`gloview:allworkspaces` (the all-workspaces "expo" view — opens into it if closed),
+`gloview:allmonitors` (expo across **every** monitor — opens into it if closed; inside the
+overview it toggles the other monitors' windows in and out. Picking one focuses it on its own
+monitor. Desktop mode always shows just the current monitor)
+Or `hyprctl gloview` / `gloviewclose` / `gloviewdesktop` / `gloviewall` / `gloviewallmonitors`
 
 Workspace navigation: `gloview:next`, `gloview:prev`, `gloview:setworkspace <id>`
 (or `hyprctl gloviewnext` / `gloviewprev`). **Inside** the overview they behave like
@@ -67,6 +70,7 @@ Lua:
 hl.bind("SUPER + TAB", hl.plugin.gloview.toggle)
 hl.bind("SUPER + SHIFT + TAB", hl.plugin.gloview.desktop)
 hl.bind("SUPER + CTRL + TAB", hl.plugin.gloview.allworkspaces)
+hl.bind("SUPER + ALT + TAB", hl.plugin.gloview.allmonitors)
 
 hl.bind("SUPER + bracketright", hl.plugin.gloview.next)
 hl.bind("SUPER + bracketleft", hl.plugin.gloview.prev)
@@ -77,6 +81,7 @@ hl.bind("SUPER + 2", function() hl.plugin.gloview.setworkspace(2) end)
 bind = SUPER, TAB, gloview:toggle
 bind = SUPER SHIFT, TAB, gloview:desktop
 bind = SUPER CTRL, TAB, gloview:allworkspaces
+bind = SUPER ALT, TAB, gloview:allmonitors
 
 bind = SUPER, bracketright, gloview:next
 bind = SUPER, bracketleft, gloview:prev
@@ -143,7 +148,6 @@ All keys live under `plugin:gloview:*`. Colors are `0xAARRGGBB` integers.
 | `exit_on_click` | bool (0/1) | `1` | Click on empty space dismisses the overview |
 | `exit_on_switch` | bool (0/1) | `0` | Dismiss when the live workspace changes underneath (e.g. a keybind) |
 | `show_all_workspaces` | bool (0/1) | `0` | Main area shows every window on the monitor (expo), not just the displayed workspace. Toggle live with `gloview:allworkspaces`, the `key_all_workspaces` key, or the strip's "All" card. Picking a preview here follows it: the overview closes onto that window's workspace |
-| `show_all_monitors` | bool (0/1) | `0` | Expo also shows the windows of every other monitor. Picking one focuses it on its own monitor, switching that monitor to its workspace. Ignored in desktop mode |
 | `show_empty` | bool (0/1) | `1` | Keep empty workspaces as strip cards. Has no effect while `dynamic_workspaces` is on (which it is by default) — set that to `0` to get the old always-list-everything strip back |
 | `dynamic_workspaces` | bool (0/1) | `1` | GNOME/hyprnome-style workspaces: only populated workspaces are listed and the strip ends in one empty card (drawn as a workspace, not a `+`). Stepping onto it or dropping a window into it creates it; the *next* empty card only appears once a window actually lands there, so you never see two blank desktops in a row, and emptying it again takes the extra card back away. Workspaces you empty drop off the strip. Forces `show_empty` off. Pair with `autodelete_empty` if you also want workspaces your config pins to be destroyed, not just hidden |
 | `autodelete_empty` | bool (0/1) | `1` | Let Hyprland reap empty workspaces this monitor still pins. Hyprland already destroys unpinned empties on its own, so this only affects ones held by a `persistent:true` rule (and gloview's own abandoned trailing workspace) — the "empty ones get deleted automatically" half of GNOME-style workspaces. **Releasing a persistent workspace lasts until your next config reload — set this to `0` if you keep `persistent:true` workspaces you want left alone.** Skips the displayed workspace, anything visible on any monitor, workspaces holding any window (mapped or not), scratchpads, named workspaces, and other monitors' workspaces |
@@ -212,7 +216,6 @@ supersedes the older `bar_position` (top/bottom only); set `anchor` and it wins.
                 key_workspace = "1,2,3,4,5,6,7,8,9,0",
 
                 show_all_workspaces     = 0,
-                show_all_monitors       = 0,
                 show_empty              = 1,
                 dynamic_workspaces      = 1,
                 autodelete_empty        = 1,
@@ -298,7 +301,6 @@ plugin {
         key_workspace = 1,2,3,4,5,6,7,8,9,0
 
         show_all_workspaces     = 0
-        show_all_monitors       = 0
         show_empty              = 1
         dynamic_workspaces      = 1
         autodelete_empty        = 1

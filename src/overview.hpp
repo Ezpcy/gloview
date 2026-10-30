@@ -73,6 +73,7 @@ class Overview {
     void hardClose(); // immediate, animation-free teardown for the UNLOAD path (hyprctl gloviewunload)
     void toggleDesktop(); // open (or, if already open, switch into) free-arrange desktop mode
     void toggleAllWorkspaces(); // open (or, if already open, toggle) the all-workspaces "expo" main view
+    void toggleAllMonitors();   // open (or, if already open, toggle) expo across EVERY monitor
 
     // Workspace navigation, exposed as dispatchers / lua (gloview:next, gloview:prev,
     // gloview:setworkspace). While the overview is UP these move the DISPLAYED workspace
@@ -235,6 +236,9 @@ class Overview {
     // expo view: -1 = follow plugin:gloview:show_all_workspaces, 0 = runtime-forced off,
     // 1 = runtime-forced on (the gloview:allworkspaces toggle). Reset to -1 on full close.
     int                                   m_allOverride = -1;
+    // expo also lists other monitors' windows (the gloview:allmonitors toggle). Only consulted
+    // while expo is on; runtime-only, reset on full close.
+    bool                                  m_allMonitors = false;
     double                                m_desktopS  = 1.0;  // monitor→preview scale (and its inverse for drops)
     double                                m_desktopOx = 0.0;  // monitor-local preview origin x
     double                                m_desktopOy = 0.0;  // monitor-local preview origin y
@@ -298,6 +302,7 @@ class Overview {
     int    nextWorkspaceId() const;     // lowest free workspace id (>= 1)
     int    resolveNewId(int wanted) const; // the id a create-on-use card advertised, unless it got taken meanwhile
     bool   showAllWorkspaces() const; // effective expo state: runtime override (m_allOverride) else plugin:gloview:show_all_workspaces
+    void   reflowMembership(); // rebuild after a membership flip and glide survivors (chrome stays settled)
     bool   tileBelongs(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWORKSPACE& ws) const; // shared main-area membership test (buildTiles + syncTiles MUST agree)
     bool   onLiveDesktop(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWORKSPACE& live) const; // window is on the desktop the overlay hands over to/from (else Tile::fades)
     void   buildTiles();

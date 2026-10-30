@@ -884,7 +884,33 @@ void Overview::toggleAllWorkspaces() {
         return;
     }
     m_allOverride = showAllWorkspaces() ? 0 : 1;
-    // rebuild from the new membership and glide tiles into place (chrome settled at progress 1).
+    if (m_allOverride == 0) // leaving expo leaves its all-monitors widening too
+        m_allMonitors = false;
+    reflowMembership();
+}
+
+// gloview:allmonitors — expo widened to every monitor's windows. Same shape as
+// toggleAllWorkspaces: OPENS straight into it if closed; while open flips the widening, and
+// turning it on forces expo on (it only means anything there). Turning it off keeps expo up.
+void Overview::toggleAllMonitors() {
+    if (!(m_active && m_opening)) {
+        m_allMonitors = true; // set BEFORE open() so buildTiles sees it
+        m_allOverride = 1;
+        open();
+        if (!m_active) { // open declined — don't leave it armed
+            m_allMonitors = false;
+            m_allOverride = -1;
+        }
+        return;
+    }
+    m_allMonitors = !m_allMonitors;
+    if (m_allMonitors)
+        m_allOverride = 1;
+    reflowMembership();
+}
+
+// Rebuild from the new membership and glide tiles into place (chrome settled at progress 1).
+void Overview::reflowMembership() {
     std::vector<std::pair<PHLWINDOW, LRect>> oldBoxes;
     oldBoxes.reserve(m_tiles.size());
     for (size_t i = 0; i < m_tiles.size(); ++i)
@@ -1117,12 +1143,12 @@ bool Overview::tileBelongs(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWOR
     if (showAllWorkspaces()) { // expo: every window living on this monitor, any workspace
         if (wsSpecial(wws) && cfgInt("plugin:gloview:show_special", 0) == 0)
             return false;
-        // show_all_monitors widens expo to every monitor. Those tiles are never on this
+        // gloview:allmonitors (m_allMonitors) widens expo to every monitor. Those tiles are never on this
         // monitor's live desktop, so onLiveDesktop() makes them fade in/out in place, and a pick
         // hands off through fullWindowFocus, which switches the window's OWN monitor to its
         // workspace. Not in desktop mode: its canvas maps this one monitor, so another
         // monitor's window would land off-canvas.
-        const bool allMonitors = cfgInt("plugin:gloview:show_all_monitors", 0) != 0 && !m_desktopMode;
+        const bool allMonitors = m_allMonitors && !m_desktopMode;
         return allMonitors || wws->m_monitor.lock() == m;
     }
     return wws == ws; // single displayed workspace (may be inactive; fine)
@@ -3726,6 +3752,7 @@ void Overview::deactivate() {
     m_pendingDeactivate = false;
     m_desktopMode = false;
     m_allOverride = -1; // next open follows plugin:gloview:show_all_workspaces again
+    m_allMonitors = false;
     m_newCardAnim = false;
     m_newCardId   = 0;
     m_progress = 0.0;
