@@ -50,8 +50,9 @@ hot-reloads into the running Hyprland.
 Dispatchers: `gloview:toggle`, `gloview:open`, `gloview:close`, `gloview:desktop`,
 `gloview:allworkspaces` (the all-workspaces "expo" view — opens into it if closed),
 `gloview:allmonitors` (expo across **every** monitor — opens into it if closed; inside the
-overview it toggles the other monitors' windows in and out. Picking one focuses it on its own
-monitor. Desktop mode always shows just the current monitor)
+overview it toggles the other monitors' windows and workspace cards in and out. Picking one
+switches its own monitor to it and focuses it there. Desktop mode always shows just the current
+monitor)
 Or `hyprctl gloview` / `gloviewclose` / `gloviewdesktop` / `gloviewall` / `gloviewallmonitors`
 
 Workspace navigation: `gloview:next`, `gloview:prev`, `gloview:setworkspace <id>`

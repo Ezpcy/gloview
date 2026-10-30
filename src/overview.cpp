@@ -1143,15 +1143,43 @@ bool Overview::tileBelongs(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWOR
     if (showAllWorkspaces()) { // expo: every window living on this monitor, any workspace
         if (wsSpecial(wws) && cfgInt("plugin:gloview:show_special", 0) == 0)
             return false;
-        // gloview:allmonitors (m_allMonitors) widens expo to every monitor. Those tiles are never on this
+        // gloview:allmonitors widens expo to every monitor. Those tiles are never on this
         // monitor's live desktop, so onLiveDesktop() makes them fade in/out in place, and a pick
-        // hands off through fullWindowFocus, which switches the window's OWN monitor to its
-        // workspace. Not in desktop mode: its canvas maps this one monitor, so another
-        // monitor's window would land off-canvas.
-        const bool allMonitors = m_allMonitors && !m_desktopMode;
-        return allMonitors || wws->m_monitor.lock() == m;
+        // goes through handOffToMonitor().
+        return spanAllMonitors() || wws->m_monitor.lock() == m;
     }
     return wws == ws; // single displayed workspace (may be inactive; fine)
+}
+
+// Not in desktop mode: its canvas maps this one monitor, so another monitor's window would
+// land off-canvas.
+bool Overview::spanAllMonitors() const {
+    return m_allMonitors && showAllWorkspaces() && !m_desktopMode;
+}
+
+bool Overview::onOtherMonitor(const PHLWORKSPACE& ws) const {
+    const auto own = ws ? ws->m_monitor.lock() : nullptr;
+    return own && own != m_monitor.lock();
+}
+
+// Picking a window or card that lives on ANOTHER monitor. Displaying it here would make
+// close() commit it onto THIS monitor, which drags the workspace over. So the overview closes
+// onto its own displayed workspace, and the target's own monitor switches live instead. Done
+// explicitly rather than leaning on fullWindowFocus's hidden-workspace switch, so card picks
+// (no window) and window picks take the same path.
+void Overview::handOffToMonitor(const PHLWORKSPACE& ws, const PHLWINDOW& w, bool keybind) {
+    const auto mon = ws ? ws->m_monitor.lock() : nullptr;
+    close();
+    if (!mon)
+        return;
+    const auto before = mon->m_activeWorkspace;
+    if (before != ws) // a special workspace is toggled on by changeWorkspace itself
+        mon->changeWorkspace(ws, false, true, w != nullptr); // a window pick focuses it below
+    if (w)
+        Desktop::focusState()->fullWindowFocus(w, keybind ? Desktop::FOCUS_REASON_KEYBIND : Desktop::FOCUS_REASON_CLICK);
+    else
+        Desktop::focusState()->rawMonitorFocus(mon);
+    dbg(std::format("handoff to {}: workspace {} -> {} (now {})", mon->m_name, wsId(before), wsId(ws), wsId(mon->m_activeWorkspace)));
 }
 
 // A tile glides to/from its REAL geometry only when its window is part of the live desktop the
@@ -1245,10 +1273,13 @@ void Overview::buildStrip() {
     const bool showSpecial = cfgInt("plugin:gloview:show_special", 0) != 0;
     const auto wsHasWindows = [this](const PHLWORKSPACE& w) { return wsHasMappedWindows(w); };
 
+    // gloview:allmonitors lists every monitor's workspaces too, sorted in with ours by id
+    // (Hyprland's ids are global). The create-on-use tail stays ours.
+    const bool allMonitors = spanAllMonitors();
     std::vector<PHLWORKSPACE> wss;
     for (const auto& wref : State::workspaceState()->workspaces()) {
         const auto ws = wref.lock();
-        if (!ws || ws->m_monitor.lock() != m)
+        if (!ws || !ws->m_monitor.lock() || (ws->m_monitor.lock() != m && !allMonitors))
             continue;
         if (wsSpecial(ws)) {
             if (showSpecial && wsHasWindows(ws)) // a scratchpad is only meaningful when populated
@@ -1280,9 +1311,13 @@ void Overview::buildStrip() {
 
     for (const auto& ws : wss) {
         StripItem it;
-        it.ws     = ws;
-        it.id     = wsId(ws);
-        it.active = (ws == cur);
+        it.ws      = ws;
+        it.id      = wsId(ws);
+        it.active  = (ws == cur);
+        it.foreign = onOtherMonitor(ws);
+        // slots are fractions of the monitor the workspace is ON, so another monitor's card
+        // maps its windows from that monitor's geometry
+        const auto wm = it.foreign ? ws->m_monitor.lock() : m;
         for (const auto& w : Desktop::windowState()->windows()) {
             if (!w || !w->mapped() || w->isHidden() || w->m_workspace != ws)
                 continue;
@@ -1290,7 +1325,7 @@ void Overview::buildStrip() {
             const auto s = w->sizeAnimation()->goal();
             StripWin sw;
             sw.win = w;
-            sw.rel = LRect{(p.x - m->m_position.x) / m->m_size.x, (p.y - m->m_position.y) / m->m_size.y, s.x / m->m_size.x, s.y / m->m_size.y};
+            sw.rel = LRect{(p.x - wm->m_position.x) / wm->m_size.x, (p.y - wm->m_position.y) / wm->m_size.y, s.x / wm->m_size.x, s.y / wm->m_size.y};
             it.wins.push_back(sw);
         }
         m_strip.push_back(std::move(it));
@@ -1306,7 +1341,9 @@ void Overview::buildStrip() {
     // one you were standing on looked duplicated. When the highest-id listed workspace is
     // already empty it IS the tail, so no create-on-use card is appended; putting a window on
     // it makes the next one appear (and emptying it again takes it back away).
-    const bool haveEmptyTail = dynamic && !wss.empty() && wsId(wss.back()) > 0 && !wsHasWindows(wss.back());
+    // (Our highest-id workspace: another monitor's cards sort in among ours under allmonitors.)
+    const auto ownLast = std::find_if(wss.rbegin(), wss.rend(), [&](const PHLWORKSPACE& ws) { return !onOtherMonitor(ws); });
+    const bool haveEmptyTail = dynamic && ownLast != wss.rend() && wsId(*ownLast) > 0 && !wsHasWindows(*ownLast);
     StripItem  plus;
     plus.isPlus = true;
     plus.isNew  = dynamic;
@@ -2925,6 +2962,10 @@ void Overview::switchToWorkspace(const StripItem& it) {
         setPersistent(ws, true);
         m_newWs = ws;
     } else if (const auto target = it.ws.lock()) {
+        if (onOtherMonitor(target)) {
+            handOffToMonitor(target, nullptr, false);
+            return;
+        }
         ws = target;
         if (ws == cur)
             return; // already showing it
@@ -3417,6 +3458,10 @@ void Overview::activateSelection() {
 // one, and close() commits m_workspace — so without retargeting it first the overview closed
 // back onto the workspace you started on and merely raised a window you could not see.
 void Overview::activateWindow(const PHLWINDOW& w, bool keybind) {
+    if (w && onOtherMonitor(w->m_workspace)) {
+        handOffToMonitor(w->m_workspace, w, keybind);
+        return;
+    }
     if (w) {
         const auto m  = m_monitor.lock();
         const auto ws = w->m_workspace;
@@ -3568,7 +3613,8 @@ void Overview::stepWorkspace(int dir) {
     std::vector<int> real;
     int              activePos = -1;
     for (size_t i = 0; i < m_strip.size(); ++i) {
-        if ((m_strip[i].isPlus && !m_strip[i].isNew) || m_strip[i].isAll)
+        // another monitor's card would close the overview mid-step (see handOffToMonitor)
+        if ((m_strip[i].isPlus && !m_strip[i].isNew) || m_strip[i].isAll || m_strip[i].foreign)
             continue;
         if (m_strip[i].active)
             activePos = static_cast<int>(real.size());
@@ -3716,6 +3762,10 @@ bool Overview::shouldHideWindow(const PHLWINDOW& w, const PHLMONITOR& mon) const
     // so suppressing those windows on all outputs is correct; windows owned by another
     // monitor's workspace never match and keep rendering normally.
     (void)mon;
+    // gloview:allmonitors draws previews of OTHER monitors' windows too, but those monitors are
+    // not covered by the overlay; their windows must keep rendering there.
+    if (onOtherMonitor(w->m_workspace))
+        return false;
     // hide the windows we draw previews for
     for (const auto& t : m_tiles)
         if (t.win.lock() == w)

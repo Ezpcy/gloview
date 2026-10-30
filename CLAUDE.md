@@ -275,9 +275,14 @@ slide away). Consequences:
   that window's workspace (`activateWindow`), which is separate from plain selection.
   **`gloview:allmonitors`** (`toggleAllMonitors`, runtime `m_allMonitors`, no config option;
   reset on full close, and cleared when expo itself is toggled off) widens expo's membership
-  (`tileBelongs`) to every monitor (never in desktop mode, whose canvas maps one monitor):
-  those tiles are always `fades`, and a pick leaves `m_workspace` alone and lets
-  `fullWindowFocus` switch the window's OWN monitor.
+  (`tileBelongs`, via `spanAllMonitors()`) and the strip (`StripItem::foreign` cards, slots
+  mapped from their OWN monitor's geometry) to every monitor (never in desktop mode, whose
+  canvas maps one monitor). Those tiles are always `fades`. **A pick of another monitor's
+  window or card must never become `m_workspace`** — close() would commit it onto THIS
+  monitor and drag the workspace over — so `activateWindow` / `switchToWorkspace` route it to
+  `handOffToMonitor` (close, then that monitor's own `changeWorkspace` + focus), and
+  `stepWorkspace` skips foreign cards. `shouldHideWindow` never hides another monitor's
+  windows: they are tiles here, but their own monitor isn't covered by the overlay.
   **Only tiles on the live desktop hand off to a real window — on open those on the active
   workspace (or active scratchpad) shrink in from their real geometry, on close those landing
   on the committed `m_workspace` glide out to it; every other tile is `Tile::fades`**

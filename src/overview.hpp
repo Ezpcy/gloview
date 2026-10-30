@@ -152,6 +152,9 @@ class Overview {
         // a "+" glyph. It still carries isPlus (create-on-use), but it is drawn like a normal
         // card, is labelled with the id it will take, and participates in next/prev stepping.
         bool                  isNew  = false;
+        // gloview:allmonitors: this workspace lives on ANOTHER monitor. Picking it hands off to
+        // that monitor (handOffToMonitor) instead of displaying it here, and stepping skips it.
+        bool                  foreign = false;
         LRect                 card; // monitor-local logical
         std::vector<StripWin> wins;
         SP<Render::ITexture>  label; // cached rendered workspace name
@@ -303,6 +306,9 @@ class Overview {
     int    resolveNewId(int wanted) const; // the id a create-on-use card advertised, unless it got taken meanwhile
     bool   showAllWorkspaces() const; // effective expo state: runtime override (m_allOverride) else plugin:gloview:show_all_workspaces
     void   reflowMembership(); // rebuild after a membership flip and glide survivors (chrome stays settled)
+    bool   spanAllMonitors() const; // gloview:allmonitors in effect: expo on, not desktop mode
+    bool   onOtherMonitor(const PHLWORKSPACE& ws) const; // ws is owned by a monitor other than ours
+    void   handOffToMonitor(const PHLWORKSPACE& ws, const PHLWINDOW& w, bool keybind); // close, switch ws's OWN monitor to it, focus
     bool   tileBelongs(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWORKSPACE& ws) const; // shared main-area membership test (buildTiles + syncTiles MUST agree)
     bool   onLiveDesktop(const PHLWINDOW& w, const PHLMONITOR& m, const PHLWORKSPACE& live) const; // window is on the desktop the overlay hands over to/from (else Tile::fades)
     void   buildTiles();
